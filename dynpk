@@ -1,5 +1,5 @@
 #!/bin/env python
-# Copyright Robert Spanton 2010 <rspanton@zepler.net>
+# Copyright 2010 Robert Spanton <rspanton@zepler.net>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,18 +19,55 @@ if len(sys.argv) < 3:
     print "Usage: %s output-dir exec1 [exec2 ...]" % (os.path.basename(sys.argv[0]))
     sys.exit(1)
 
-def get_libs(fname):
-    p = subprocess.Popen("ldd %s | grep '=>'" % fname,
-                         shell = True,
-                         stdout = subprocess.PIPE)
-    so, se = p.communicate()
-    assert p.wait() == 0
+class File:
+    def __init__(self, source, dest, perms = None):
+        self.source = source
+        self.dest = dest
+        self.perms = perms
 
-    return re.findall( "/[^ ]+", so )
+    def __hash__(self):
+        s = "%s %s %s" % (self.source, self.dest, str(self.perms))
+        return s.__hash__()
 
-def write_wrapper(fname, wrapper_name):
-    f = open( wrapper_name , "w" )
-    f.write( """#!/bin/bash
+    def __eq__(self, other):
+        if ( self.source != other.source or
+             self.dest != other.dest or
+             self.perms != other.perms ):
+            return False
+        return True
+
+class Entity:
+    def __init__(self):
+        pass
+
+class Elf(Entity):
+    def __init__(self, fname):
+        self.fname = fname
+        Entity.__init__(self)
+
+    def _get_libs(self):
+        p = subprocess.Popen("ldd %s | grep '=>'" % self.fname,
+                             shell = True,
+                             stdout = subprocess.PIPE)
+        so, se = p.communicate()
+        assert p.wait() == 0
+
+        return re.findall( "/[^ ]+", so )
+
+    def get_files(self):
+        files = []
+
+        for lib in self._get_libs():
+            files.append( File( lib, os.path.basename(lib) ) )
+
+        files.append( File( self.fname,
+                            os.path.basename(self.fname),
+                            perms = stat.S_IRUSR | stat.S_IWUSR ) )
+        return files
+
+    def _write_wrapper(self, wrapper_name):
+        f = open( wrapper_name , "w" )
+        f.write( """#!/bin/bash
 
 SCRIPT_DIR="${BASH_SOURCE[0]}";
 if([ -h "${SCRIPT_DIR}" ]) then
@@ -45,11 +82,19 @@ LIBDIR=$SCRIPT_DIR/..
 
 export AUDIT_PREFIX=$LIBDIR
 exec $LIBDIR/ld-linux.so.2 --library-path $LIBDIR --audit libaudit.so $LIBDIR/%s $@
-""" % os.path.basename(fname) )
-    f.close()
+""" % os.path.basename(self.fname) )
+        f.close()
 
-    # Add executable permissions
-    os.chmod( wrapper_name, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR )
+        # Add executable permissions
+        os.chmod( wrapper_name, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR )
+
+    def add_extras(self, basedir):
+        self._write_wrapper( os.path.join( basedir,
+                                           "bin",
+                                           os.path.basename(self.fname) ) )
+
+class InstalledRpm(Entity):
+    pass
 
 DIRN = sys.argv[1]
 fnames = sys.argv[2:]
@@ -64,24 +109,26 @@ shutil.copy( "/lib/ld-linux.so.2", DIRN )
 script_dir = os.path.dirname( os.path.abspath(__file__) )
 shutil.copy( os.path.join( script_dir, "libaudit.so" ), DIRN )
 
-libs = set()
+ents = []
+files = set()
 
-# Copy the binaries across:
 for fname in fnames:
-    shutil.copy( fname, DIRN )
+    ent = Elf(fname)
+    ents.append(ent)
 
-    for lib in get_libs(fname):
-        libs.add(lib)
+    for f in ent.get_files():
+        files.add(f)
 
-    basename = os.path.basename(fname)
+    ent.add_extras(DIRN)
 
-    # Remove executable permissions from it
-    # as it has to be run through the wrapper script
-    os.chmod( os.path.join( DIRN, basename ),
-              stat.S_IRUSR | stat.S_IWUSR )
+for f in files:
+    dest = os.path.join( DIRN, f.dest )
 
-    write_wrapper(fname, os.path.join(BINDIR, basename))
+    destdir = os.path.dirname(dest)
+    if not os.path.isdir( destdir ):
+        os.makedirs( destdir )
 
-# Copy the libraries in:
-for lib in libs:
-    shutil.copy( lib, DIRN )
+    shutil.copy( f.source, dest )
+
+    if f.perms != None:
+        os.chmod( dest, f.perms )
