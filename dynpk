@@ -94,7 +94,23 @@ exec $LIBDIR/ld-linux.so.2 --library-path $LIBDIR --audit libaudit.so $LIBDIR/%s
                                            os.path.basename(self.fname) ) )
 
 class InstalledRpm(Entity):
-    pass
+    def __init__(self, pkgname):
+        self.pkgname = pkgname
+        Entity.__init__(self)
+
+    def get_files(self):
+        p = subprocess.Popen( "rpm -ql %s" % self.pkgname,
+                              stdout = subprocess.PIPE, shell = True)
+        so, se = p.communicate()
+        assert( p.wait() == 0 )
+
+        files = []
+        for x in so.splitlines():
+            files.append( File( x, x[1:] ) )
+        return files
+
+    def add_extras(self, basedir):
+        pass
 
 DIRN = sys.argv[1]
 fnames = sys.argv[2:]
@@ -113,7 +129,10 @@ ents = []
 files = set()
 
 for fname in fnames:
-    ent = Elf(fname)
+    if fname[:4] == "rpm(":
+        ent = InstalledRpm(fname[4:-1])
+    else:
+        ent = Elf(fname)
     ents.append(ent)
 
     for f in ent.get_files():
