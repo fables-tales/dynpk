@@ -65,28 +65,6 @@ class Elf(Entity):
                             perms = stat.S_IRUSR | stat.S_IWUSR ) )
         return files
 
-    def _write_wrapper(self, wrapper_name):
-        f = open( wrapper_name , "w" )
-        f.write( """#!/bin/bash
-
-SCRIPT_DIR="${BASH_SOURCE[0]}";
-if([ -h "${SCRIPT_DIR}" ]) then
-  while([ -h "${SCRIPT_DIR}" ]) do SCRIPT_DIR=`readlink "${SCRIPT_DIR}"`; done
-fi
-pushd . > /dev/null
-cd `dirname ${SCRIPT_DIR}` > /dev/null
-SCRIPT_DIR=`pwd`;
-popd  > /dev/null
-
-LIBDIR=$SCRIPT_DIR/..
-
-export AUDIT_PREFIX=$LIBDIR
-exec $LIBDIR/ld-linux.so.2 --library-path $LIBDIR --audit libaudit.so $LIBDIR/%s $@
-""" % os.path.basename(self.fname) )
-        f.close()
-
-        # Add executable permissions
-        os.chmod( wrapper_name, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR )
 
     def add_extras(self, basedir):
         self._write_wrapper( os.path.join( basedir,
@@ -115,15 +93,24 @@ class InstalledRpm(Entity):
 DIRN = sys.argv[1]
 fnames = sys.argv[2:]
 
+if os.path.exists(DIRN):
+    print "Target directory \"%s\" already exists." % DIRN
+    print "Cowardly refusing to overwrite it."
+    sys.exit(1)
+
 os.makedirs( DIRN )
 BINDIR = os.path.join( DIRN, "bin" )
 os.mkdir( BINDIR )
+LIBDIR = os.path.join( DIRN, "lib" )
+os.mkdir( LIBDIR )
 
 # Dynamic linker:
-shutil.copy( "/lib/ld-linux.so.2", DIRN )
+shutil.copy( "/lib/ld-linux.so.2", LIBDIR )
 # Auditor:
 script_dir = os.path.dirname( os.path.abspath(__file__) )
-shutil.copy( os.path.join( script_dir, "libaudit.so" ), DIRN )
+shutil.copy( os.path.join( script_dir, "libaudit.so" ), LIBDIR )
+# Fakechroot
+shutil.copy( "/usr/lib/fakechroot/libfakechroot.so", LIBDIR )
 
 ents = []
 files = set()
@@ -151,3 +138,81 @@ for f in files:
 
     if f.perms != None:
         os.chmod( dest, f.perms )
+
+def is_elf(path):
+    f = subprocess.Popen( "file -b %s" % path,
+                          shell = True,
+                          stdout = subprocess.PIPE )
+    so, se = f.communicate()
+    assert( f.wait() == 0 )
+
+    if "ELF" in so and "executable" in so:
+        return True
+    return False
+
+def write_wrapper(wrapper_path, target):
+    f = open( wrapper_name , "w" )
+    f.write( """#!/bin/bash
+
+export AUDIT_PREFIX=$FAKEROOT_BASE
+export LD_AUDIT=libaudit.so
+export LD_LIBRARY_PATH=$FAKEROOT_BASE/lib
+
+exec /lib/ld-linux.so.2 $FAKEROOT_BASE/%s $@
+""" % os.path.basename(target) )
+    f.close()
+
+    # Add executable permissions
+    os.chmod( wrapper_name, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR )
+
+def wrap_binary(path):
+    assert( path[:len(DIRN)] == DIRN )
+    abspath = path[len(DIRN):]
+
+    # Move the binary into /wrap${abspath}
+    wrap_dir = os.path.join( DIRN, "wrap" )
+    wrap_dir = "%s%s" % (wrap_dir, os.path.dirname(abspath))
+
+    if not os.path.exists(wrap_dir):
+        os.makedirs(wrap_dir)
+
+    shutil.move(path, wrap_dir)
+    write_wrapper( path, "%s%s" % ("/wrap", abspath) )
+
+def proc_dir(arg, dirname, names):
+    for name in names:
+        fullpath = os.path.join(dirname, name)
+
+        if is_elf( fullpath ):
+            # Wrap it up!
+            wrap_binary(fullpath)
+
+# Now iterate through all files, and wrap executable elves up in 
+# a blanket of fakechroot
+os.path.walk( DIRN, proc_dir, None )
+
+# Write the script to climb inside the fakechroot
+fake_script = os.path.join( DIRN, "fake" )
+f = open( fake_script, "w" )
+f.write( """#!/bin/bash
+
+SCRIPT_DIR="${BASH_SOURCE[0]}";
+if([ -h "${SCRIPT_DIR}" ]) then
+  while([ -h "${SCRIPT_DIR}" ]) do SCRIPT_DIR=`readlink "${SCRIPT_DIR}"`; done
+fi
+pushd . > /dev/null
+cd `dirname ${SCRIPT_DIR}` > /dev/null
+SCRIPT_DIR=`pwd`;
+popd  > /dev/null
+
+echo fakechroot base: $SCRIPT_DIR
+
+export FAKECHROOT_BASE=$SCRIPT_DIR
+#export FAKECHROOT_EXCLUDE_PATH=/home:/bin
+export LD_PRELOAD=$SCRIPT_DIR/lib/libfakechroot.so
+export LD_LIBRARY_PATH=$SCRIPT_DIR/lib
+
+exec $SCRIPT_DIR/lib/ld-linux.so.2 $SCRIPT_DIR/$@
+""")
+f.close()
+os.chmod( fake_script, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR )
