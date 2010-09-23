@@ -21,6 +21,7 @@
 #include <string.h>
 #include <assert.h>
 #include <stdbool.h>
+#include <unistd.h>
 
 unsigned int la_version( unsigned int version )
 {
@@ -30,7 +31,6 @@ unsigned int la_version( unsigned int version )
 unsigned int la_objopen( struct link_map *lmp, Lmid_t lmid, unsigned int *cookie )
 {
 	static char *prefix = NULL;
-	char *absname;
 
 	if( prefix == NULL ) {
 		prefix = getenv("AUDIT_PREFIX");
@@ -44,20 +44,38 @@ unsigned int la_objopen( struct link_map *lmp, Lmid_t lmid, unsigned int *cookie
 	}
 
 	if( lmp->l_name[0] != 0 ) {
-		absname = canonicalize_file_name( lmp->l_name );
-		assert( absname != NULL );
+		if( strcmp( lmp->l_name, "ld-linux.so.2" ) == 0 ) {
+			char exebuf[512];
+			int r;
+			r = readlink( "/proc/self/exe", exebuf, sizeof(exebuf) );
+			assert( r != -1 );
+			exebuf[r] = '\0';
 
-		if( strncmp( absname, prefix, strlen(prefix) ) != 0 ) {
-			fprintf( stderr, "ERROR:\tAttempted to load dynamic library outside allowed prefix\n" );
-			fprintf( stderr, "\tApplication attempted to load \"%s\"\n", lmp->l_name );
-			fprintf( stderr, "\n\tAborting\n");
-			exit(1);
+			if( strncmp( exebuf, prefix, strlen(prefix) ) != 0 ) {
+				fprintf( stderr, "Stopping binary from loading ld-linux.so.2\n" );
+				fprintf( stderr, "in process \"%s\"\n", exebuf );
+				exit(1);
+			}
+		} else {
+			char *absname = canonicalize_file_name( lmp->l_name );
+			if( absname == NULL ) {
+				fprintf( stderr, "libaudit: ERROR: Couldn't canonicalize \"%s\"\n", lmp->l_name );
+				exit(1);
+			}
+
+			if( strncmp( absname, prefix, strlen(prefix) ) != 0 ) {
+				fprintf( stderr, "ERROR:\tAttempted to load dynamic library outside allowed prefix\n" );
+				fprintf( stderr, "\tApplication attempted to load \"%s\"\n", lmp->l_name );
+				fprintf( stderr, "\n\tAborting\n");
+				exit(1);
+			}
+
+			free(absname);
 		}
-
-		free(absname);
 	}
 
 	if( getenv( "AUDIT_DEBUG" ) )
 		printf( "file: \"%s\" loaded\n", lmp->l_name );
+
 	return LA_FLG_BINDTO | LA_FLG_BINDFROM;
 }

@@ -40,28 +40,35 @@ class Entity:
     def __init__(self):
         pass
 
+def get_elf_libs(fname):
+    p = subprocess.Popen("ldd %s | grep '=>'" % fname,
+                         shell = True,
+                         stdout = subprocess.PIPE,
+                         stderr = subprocess.PIPE)
+    so, se = p.communicate()
+    if p.wait() != 0:
+        print se
+        print "ERRROR: ldd \"%s\" failed -- aborting" % fname
+        sys.exit(1)
+
+    return re.findall( "/[^ ]+", so )
+
 class Elf(Entity):
     def __init__(self, fname):
         self.fname = fname
         Entity.__init__(self)
 
     def _get_libs(self):
-        p = subprocess.Popen("ldd %s | grep '=>'" % self.fname,
-                             shell = True,
-                             stdout = subprocess.PIPE)
-        so, se = p.communicate()
-        assert p.wait() == 0
-
-        return re.findall( "/[^ ]+", so )
+        return get_elf_libs(self.fname)
 
     def get_files(self):
         files = []
 
         for lib in self._get_libs():
-            files.append( File( lib, os.path.basename(lib) ) )
+            files.append( File( lib, lib[1:] ) )
 
         files.append( File( self.fname,
-                            os.path.basename(self.fname),
+                            "bin/%s" % os.path.basename(self.fname),
                             perms = stat.S_IRUSR | stat.S_IWUSR ) )
         return files
 
@@ -134,7 +141,14 @@ for f in files:
     if not os.path.isdir( destdir ):
         os.makedirs( destdir )
 
-    shutil.copy( f.source, dest )
+    if os.path.isdir(f.source):
+        if not os.path.exists(dest):
+            os.makedirs(dest)
+    else:
+        try:
+            shutil.copy( f.source, dest )
+        except IOError:
+            print "Warning: Couldn't read \"%s\" -- ignoring." % f.source
 
     if f.perms != None:
         os.chmod( dest, f.perms )
@@ -147,23 +161,15 @@ def is_elf(path):
     assert( f.wait() == 0 )
 
     if "ELF" in so and "executable" in so:
+        if "statically" in so:
+            print "Warning: \"%s\" is statically linked" % path
+            return False
+
         return True
     return False
 
-def write_wrapper(wrapper_path, target):
-    f = open( wrapper_name , "w" )
-    f.write( """#!/bin/bash
-
-export AUDIT_PREFIX=$FAKEROOT_BASE
-export LD_AUDIT=libaudit.so
-export LD_LIBRARY_PATH=$FAKEROOT_BASE/lib
-
-exec /lib/ld-linux.so.2 $FAKEROOT_BASE/%s $@
-""" % os.path.basename(target) )
-    f.close()
-
-    # Add executable permissions
-    os.chmod( wrapper_name, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR )
+def write_wrapper(wrapper_path):
+    shutil.copy( os.path.join( script_dir, "wrap" ), wrapper_path )
 
 def wrap_binary(path):
     assert( path[:len(DIRN)] == DIRN )
@@ -177,13 +183,26 @@ def wrap_binary(path):
         os.makedirs(wrap_dir)
 
     shutil.move(path, wrap_dir)
-    write_wrapper( path, "%s%s" % ("/wrap", abspath) )
+    write_wrapper( path )
 
 def proc_dir(arg, dirname, names):
+    assert "/wrap" not in dirname
+
     for name in names:
         fullpath = os.path.join(dirname, name)
 
         if is_elf( fullpath ):
+            # Add any missing libraries:
+            for lib in get_elf_libs(fullpath):
+                libp = "%s%s" % (DIRN, lib)
+
+                libdir = os.path.dirname(libp)
+                if not os.path.exists(libdir):
+                    os.makedirs(libdir)
+
+                if not os.path.exists(libp):
+                    shutil.copy(lib, libp)
+
             # Wrap it up!
             wrap_binary(fullpath)
 
@@ -205,14 +224,23 @@ cd `dirname ${SCRIPT_DIR}` > /dev/null
 SCRIPT_DIR=`pwd`;
 popd  > /dev/null
 
-echo fakechroot base: $SCRIPT_DIR
+export LD_LIBRARY_PATH=$SCRIPT_DIR/lib:$SCRIPT_DIR/usr/lib
 
+# Fakeroot config
 export FAKECHROOT_BASE=$SCRIPT_DIR
+export LD_PRELOAD=libfakechroot.so
 #export FAKECHROOT_EXCLUDE_PATH=/home:/bin
-export LD_PRELOAD=$SCRIPT_DIR/lib/libfakechroot.so
-export LD_LIBRARY_PATH=$SCRIPT_DIR/lib
 
-exec $SCRIPT_DIR/lib/ld-linux.so.2 $SCRIPT_DIR/$@
+# Auditing
+export AUDIT_PREFIX=$SCRIPT_DIR
+export LD_AUDIT=libaudit.so
+
+export PATH=/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin
+
+export PS1='[FAKECHROOT@\h \W]\$ '
+
+# Hand over
+exec $SCRIPT_DIR/$@
 """)
 f.close()
 os.chmod( fake_script, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR )
