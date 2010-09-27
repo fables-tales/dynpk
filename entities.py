@@ -1,4 +1,4 @@
-import os, subprocess, re, stat
+import os, subprocess, re, stat, sys
 
 class File:
     def __init__(self, source, dest, perms = None):
@@ -49,15 +49,12 @@ class Elf(Entity):
             files.append( File( lib, lib[1:] ) )
 
         files.append( File( self.fname,
-                            "bin/%s" % os.path.basename(self.fname),
-                            perms = stat.S_IRUSR | stat.S_IWUSR ) )
+                            "bin/%s" % os.path.basename(self.fname) ) )
         return files
 
 
     def add_extras(self, basedir):
-        self._write_wrapper( os.path.join( basedir,
-                                           "bin",
-                                           os.path.basename(self.fname) ) )
+        pass
 
 class InstalledRpm(Entity):
     def __init__(self, pkgname):
