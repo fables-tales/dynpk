@@ -232,8 +232,8 @@ export LD_PRELOAD=libfakechroot.so
 #export FAKECHROOT_EXCLUDE_PATH=/home:/bin
 
 # Auditing
-export AUDIT_PREFIX=$SCRIPT_DIR
-export LD_AUDIT=libaudit.so
+#export AUDIT_PREFIX=$SCRIPT_DIR
+#export LD_AUDIT=libaudit.so
 
 export PATH=/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin
 
