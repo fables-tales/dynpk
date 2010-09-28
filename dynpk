@@ -142,41 +142,6 @@ def proc_dir(arg, dirname, names):
 # a blanket of fakechroot
 os.path.walk( DIRN, proc_dir, None )
 
-# Write the script to climb inside the fakechroot
-fake_script = os.path.join( DIRN, "fake" )
-f = open( fake_script, "w" )
-f.write( """#!/bin/bash
-
-SCRIPT_DIR="${BASH_SOURCE[0]}";
-if([ -h "${SCRIPT_DIR}" ]) then
-  while([ -h "${SCRIPT_DIR}" ]) do SCRIPT_DIR=`readlink "${SCRIPT_DIR}"`; done
-fi
-pushd . > /dev/null
-cd `dirname ${SCRIPT_DIR}` > /dev/null
-SCRIPT_DIR=`pwd`;
-popd  > /dev/null
-
-export LD_LIBRARY_PATH=$SCRIPT_DIR/lib:$SCRIPT_DIR/usr/lib
-
-# Fakeroot config
-export FAKECHROOT_BASE=$SCRIPT_DIR
-export LD_PRELOAD=libfakechroot.so
-#export FAKECHROOT_EXCLUDE_PATH=/home:/bin
-
-# Auditing
-#export AUDIT_PREFIX=$SCRIPT_DIR
-#export LD_AUDIT=libaudit.so
-
-export PATH=/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin
-
-export PS1='[FAKECHROOT@\h \W]\$ '
-
-# Hand over
-exec $SCRIPT_DIR/$@
-""")
-f.close()
-os.chmod( fake_script, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR )
-
 conf_fname = os.path.join( DIRN, "dynpk.config" )
 f = open( conf_fname, "w" )
 f.write( """#File automatically made by dynpk
