@@ -149,7 +149,7 @@ f.write( """#File automatically made by dynpk
 # Fakechroot stuff
 FAKECHROOT_BASE=$FAKECHROOT_BASE
 LD_PRELOAD=libfakechroot.so
-FAKECHROOT_EXCLUDE_PATH=/home
+FAKECHROOT_EXCLUDE_PATH=/home:/tmp:/dev
 
 LD_LIBRARY_PATH=$FAKECHROOT_BASE/lib:$FAKECHROOT_BASE/usr/lib
 PATH=/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin
