@@ -176,3 +176,27 @@ exec $SCRIPT_DIR/$@
 """)
 f.close()
 os.chmod( fake_script, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR )
+
+conf_fname = os.path.join( DIRN, "dynpk.config" )
+f = open( conf_fname, "w" )
+f.write( """#File automatically made by dynpk
+
+# Fakechroot stuff
+FAKECHROOT_BASE=$FAKECHROOT_BASE
+LD_PRELOAD=libfakechroot.so
+#FAKECHROOT_EXCLUDE_PATH=/home:/bin
+
+LD_LIBRARY_PATH=$FAKECHROOT_BASE/lib:$FAKECHROOT_BASE/usr/lib
+PATH=/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin
+
+# Auditing
+#AUDIT_PREFIX=$FAKECHROOT_BASE
+#LD_AUDIT=libaudit.so
+
+PS1=[FAKECHROOT@\h \W]\$ 
+""" )
+f.close()
+
+f = open( os.path.join( DIRN, ".fakechroot-base" ), "w" )
+f.write("Base of fakeroot tree");
+f.close()
