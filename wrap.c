@@ -54,6 +54,9 @@ int main( int argc, char** argv )
 	strcat( wrapbin, "/wrap" );
 	strcat( wrapbin, my_abs );
 
+	free(exebuf);
+	exebuf = NULL;
+
 	/* Create the path of the fakechroot's ld-linux.so.2 */
 	char *fakeld = malloc( strlen(fcr_base) + strlen("/lib/ld-linux.so.2") + 1 );
 	assert( fakeld != NULL );
