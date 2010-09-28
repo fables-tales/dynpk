@@ -4,20 +4,34 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <libgen.h>
+#include <limits.h>
+
+static char* find_mypath( void )
+{
+	size_t size = 100;
+	char *buf = NULL;
+
+	/* Loop until we reach the maximum path length */
+	while (1) {
+		int r;
+		buf = realloc( buf, size );
+
+		r = readlink( "/proc/self/exe", buf, size );
+		if( r < size ) {
+			buf[r] = '\0';
+			return buf;
+		}
+
+		size += 100;
+		assert( size < PATH_MAX );
+	}
+}
 
 int main( int argc, char** argv )
 {
-	char exebuf[512];
+	char *exebuf = find_mypath();
 	char *fcr_base, *wrapbin;
-	ssize_t r;
 
-	r = readlink( "/proc/self/exe", exebuf, sizeof(exebuf) );
-	if( r == -1 ) {
-		fprintf( stderr, "wrap: Failed to readlink\n" );
-		return 1;
-	}
-	exebuf[r] = '\0';
-	
 	/* Remove the prefix from this */
 	fcr_base = getenv( "FAKECHROOT_BASE" );
 	if( fcr_base == NULL ) {
