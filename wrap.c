@@ -80,7 +80,8 @@ static char* find_chroot_base( const char* exepath )
 		free(tfname);
 	}
 
-	printf( "found base: %s\n", dir );
+	if( getenv( "WRAP_DEBUG" ) != NULL )
+		printf( "wrap: found base: %s\n", dir );
 	/* No need to have all the cruft hanging around: */
 	ret = strdup(dir);
 	free(dir);
@@ -171,7 +172,8 @@ static void conf_fakeenv( const char* exepath )
 
 		val = str_replace( val, "$FAKECHROOT_BASE", chroot_base );
 
-		printf( "Setting \"%s\" to \"%s\"\n", varname, val );
+		if( getenv( "WRAP_DEBUG" ) != NULL )
+			printf( "Setting \"%s\" to \"%s\"\n", varname, val );
 
 		setenv( varname, val, 1 );
 		free(val);
