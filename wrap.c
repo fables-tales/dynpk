@@ -81,7 +81,7 @@ static char* find_chroot_base( const char* exepath )
 	}
 
 	if( getenv( "WRAP_DEBUG" ) != NULL )
-		printf( "wrap: found base: %s\n", dir );
+		fprintf( stderr, "wrap: found base: %s\n", dir );
 	/* No need to have all the cruft hanging around: */
 	ret = strdup(dir);
 	free(dir);
