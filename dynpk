@@ -38,9 +38,12 @@ os.mkdir( LIBDIR )
 
 # Dynamic linker:
 shutil.copy( "/lib/ld-linux.so.2", LIBDIR )
-# Auditor:
+
 script_dir = os.path.dirname( os.path.abspath(__file__) )
-shutil.copy( os.path.join( script_dir, "libaudit.so" ), LIBDIR )
+
+if conf.use_audit:
+    "Include libaudit"
+    shutil.copy( os.path.join( script_dir, "libaudit.so" ), LIBDIR )
 
 # Fakechroot
 FAKEROOT_LIB="/usr/lib/fakechroot/libfakechroot.so"
@@ -155,13 +158,14 @@ FAKECHROOT_EXCLUDE_PATH=/home:/tmp:/dev
 
 LD_LIBRARY_PATH=$FAKECHROOT_BASE/lib:$FAKECHROOT_BASE/usr/lib
 PATH=/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin
-
-# Auditing
-#AUDIT_PREFIX=$FAKECHROOT_BASE
-#LD_AUDIT=libaudit.so
-
-PS1=[FAKECHROOT@\h \W]\$ 
 """ )
+
+if conf.use_audit:
+    f.write( """# Auditing
+#AUDIT_PREFIX=$FAKECHROOT_BASE
+#LD_AUDIT=libaudit.so""" )
+
+f.write( """PS1=[FAKECHROOT@\h \W]\$\n""" )
 f.close()
 
 f = open( os.path.join( DIRN, ".fakechroot-base" ), "w" )

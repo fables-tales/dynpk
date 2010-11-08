@@ -11,6 +11,7 @@ class Config:
         self.files = self._opt_break( "files" )
         self.exclude_paths = self._opt_break( "exclude_paths" )
         self.library_dirs = self._opt_break( "library_dirs" )
+        self.use_audit = self.parser.getboolean( "dynpk", "use_audit" )
 
     def _opt_break(self, name):
         "Break up a space separated config option into a list"
