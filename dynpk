@@ -13,20 +13,22 @@
 
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-import os, sys, subprocess, shutil, stat, entities
+import os, sys, subprocess, shutil, stat, entities, config
 from entities import Elf, InstalledRpm, get_elf_libs
 
 if len(sys.argv) < 3:
-    print "Usage: %s output-dir exec1 [exec2 ...]" % (os.path.basename(sys.argv[0]))
+    print "Usage: %s CONFIG_FILE OUTPUT_DIR" % (os.path.basename(sys.argv[0]))
     sys.exit(1)
 
-DIRN = sys.argv[1]
-fnames = sys.argv[2:]
+CONFIG_FILE = sys.argv[1]
+DIRN = sys.argv[2]
 
 if os.path.exists(DIRN):
     print "Target directory \"%s\" already exists." % DIRN
     print "Cowardly refusing to overwrite it."
     sys.exit(1)
+
+conf = config.Config(CONFIG_FILE)
 
 os.makedirs( DIRN )
 BINDIR = os.path.join( DIRN, "bin" )
@@ -54,13 +56,13 @@ shutil.copy( FAKEROOT_LIB , LIBDIR )
 ents = []
 files = set()
 
-for fname in fnames:
-    if fname[:4] == "rpm(":
-        ent = InstalledRpm(fname[4:-1])
-    else:
-        ent = Elf(fname)
-    ents.append(ent)
+for rp in conf.rpms:
+    ents.append( InstalledRpm(rp) )
 
+for fname in conf.files:
+    ents.append( Elf(fname) )
+
+for ent in ents:
     for f in ent.get_files():
         files.add(f)
 
