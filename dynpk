@@ -154,11 +154,14 @@ f.write( """#File automatically made by dynpk
 # Fakechroot stuff
 FAKECHROOT_BASE=$FAKECHROOT_BASE
 LD_PRELOAD=libfakechroot.so
-FAKECHROOT_EXCLUDE_PATH=/home:/tmp:/dev
+""")
 
-LD_LIBRARY_PATH=$FAKECHROOT_BASE/lib:$FAKECHROOT_BASE/usr/lib
-PATH=/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin
-""" )
+f.write( "FAKECHROOT_EXCLUDE_PATH=%s\n" % ( ":".join( conf.exclude_paths ) ) )
+
+fb = ":$FAKECHROOT_BASE"
+f.write( "LD_LIBRARY_PATH=%s\n" % (fb[1:] + fb.join( conf.library_dirs) ) )
+
+f.write( "PATH=%s\n" % ( ":".join( conf.path ) ) )
 
 if conf.use_audit:
     f.write( """# Auditing
