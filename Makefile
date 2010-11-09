@@ -9,14 +9,18 @@ libaudit.so: audit.o
 audit.o: audit.c
 	gcc -fPIC -g -c -Wall audit.c -o audit.o
 
-ifneq ($(GLIBC_RPM),)
+ifneq ($(GLIBC_RPMS),)
 LDFLAGS += -L glibc/lib -L glibc/usr/lib
 LIBC := glibc/lib/libc.so.6
 
-$(LIBC): $(GLIBC_RPM)
+$(LIBC): $(GLIBC_RPMS)
 	rm -rf glibc
 	mkdir glibc
-	( cd glibc; rpm2cpio $(abspath $(GLIBC_RPM)) | cpio -i --make-directories; )
+	( cd glibc; \
+	for r in $(abspath $(GLIBC_RPMS)) ; \
+	do \
+	    rpm2cpio $$r | cpio -i --make-directories; \
+	done ; )
 endif
 
 wrap: wrap.c $(LIBC)
