@@ -28,7 +28,7 @@ unsigned int la_version( unsigned int version )
 	return 1;
 }
 
-unsigned int la_objopen( struct link_map *lmp, Lmid_t lmid, unsigned int *cookie )
+unsigned int la_objopen( struct link_map *lmp, Lmid_t lmid, uintptr_t *cookie )
 {
 	static char *prefix = NULL;
 
