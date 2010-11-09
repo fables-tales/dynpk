@@ -52,7 +52,8 @@ if not os.path.exists( conf.fakechroot_lib ):
 shutil.copy( conf.fakechroot_lib , LIBDIR )
 
 ents = []
-files = set()
+# Keys are the destinations
+files = {}
 
 for rf in conf.local_rpms:
     ents.append( LocalRpmFile(rf) )
@@ -65,11 +66,12 @@ for fname in conf.files:
 
 for ent in ents:
     for f in ent.get_files():
-        files.add(f)
+        if f.dest not in files:
+            files[f.dest] = f
 
     ent.add_extras(DIRN)
 
-for f in files:
+for f in files.values():
     dest = os.path.join( DIRN, f.dest )
 
     destdir = os.path.dirname(dest)
