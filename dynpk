@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import os, sys, subprocess, shutil, stat, entities, config
-from entities import Elf, InstalledRpm, get_elf_libs
+from entities import Elf, InstalledRpm, get_elf_libs, LocalRpmFile
 
 if len(sys.argv) < 3:
     print "Usage: %s CONFIG_FILE OUTPUT_DIR" % (os.path.basename(sys.argv[0]))
@@ -36,9 +36,6 @@ os.mkdir( BINDIR )
 LIBDIR = os.path.join( DIRN, "lib" )
 os.mkdir( LIBDIR )
 
-# Dynamic linker:
-shutil.copy( "/lib/ld-linux.so.2", LIBDIR )
-
 script_dir = os.path.dirname( os.path.abspath(__file__) )
 
 if conf.use_audit:
@@ -58,6 +55,9 @@ shutil.copy( FAKEROOT_LIB , LIBDIR )
 
 ents = []
 files = set()
+
+for rf in conf.local_rpms:
+    ents.append( LocalRpmFile(rf) )
 
 for rp in conf.rpms:
     ents.append( InstalledRpm(rp) )
@@ -89,6 +89,9 @@ for f in files:
 
     if f.perms != None:
         os.chmod( dest, f.perms )
+
+for ent in ents:
+    ent.cleanup()
 
 def is_elf(path):
     f = subprocess.Popen( "file -b %s" % path,
@@ -146,6 +149,10 @@ def proc_dir(arg, dirname, names):
 # Now iterate through all files, and wrap executable elves up in 
 # a blanket of fakechroot
 os.path.walk( DIRN, proc_dir, None )
+
+# Dynamic linker:
+if not os.path.exists( os.path.join( LIBDIR, "/lib/ld-linux.so.2" ) ):
+    shutil.copy( "/lib/ld-linux.so.2", LIBDIR )
 
 conf_fname = os.path.join( DIRN, "dynpk.config" )
 f = open( conf_fname, "w" )

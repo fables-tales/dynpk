@@ -1,4 +1,4 @@
-import os, subprocess, re, stat, sys
+import os, subprocess, re, stat, sys, tempfile, shutil
 
 class File:
     def __init__(self, source, dest, perms = None):
@@ -7,8 +7,7 @@ class File:
         self.perms = perms
 
     def __hash__(self):
-        s = "%s %s %s" % (self.source, self.dest, str(self.perms))
-        return s.__hash__()
+        return self.dest.__hash__()
 
     def __eq__(self, other):
         if ( self.source != other.source or
@@ -56,6 +55,9 @@ class Elf(Entity):
     def add_extras(self, basedir):
         pass
 
+    def cleanup(self):
+        pass
+
 class InstalledRpm(Entity):
     def __init__(self, pkgname):
         self.pkgname = pkgname
@@ -74,3 +76,32 @@ class InstalledRpm(Entity):
 
     def add_extras(self, basedir):
         pass
+
+    def cleanup(self):
+        pass
+
+class LocalRpmFile(Entity):
+    def __init__(self, fname):
+        self.tmpdir = tempfile.mkdtemp()
+        p = subprocess.Popen( "rpm2cpio %s | cpio -i --make-directories" % os.path.abspath(fname),
+                              shell = True,
+                              cwd = self.tmpdir )
+        assert p.wait() == 0
+
+    def get_files(self):
+        files = []
+
+        for d in os.walk( self.tmpdir ):
+            dirpath, dnames, fnames = d
+
+            for fname in fnames:
+                full = os.path.join( dirpath, fname )
+                files.append( File( full,
+                                    full[len(self.tmpdir)+1:] ) )
+        return files
+
+    def add_extras(self, basedir):
+        pass
+
+    def cleanup(self):
+        shutil.rmtree(self.tmpdir)

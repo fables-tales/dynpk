@@ -8,6 +8,7 @@ class Config:
         self.parser.read( fname )
 
         self.rpms = self._opt_break( "rpms" )
+        self.local_rpms = self._opt_break( "local_rpms" )
         self.files = self._opt_break( "files" )
         self.exclude_paths = self._opt_break( "exclude_paths" )
         self.library_dirs = self._opt_break( "library_dirs" )
