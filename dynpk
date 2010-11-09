@@ -42,16 +42,14 @@ if conf.use_audit:
     "Include libaudit"
     shutil.copy( os.path.join( script_dir, "libaudit.so" ), LIBDIR )
 
-# Fakechroot
-FAKEROOT_LIB="/usr/lib/fakechroot/libfakechroot.so"
-if not os.path.exists( FAKEROOT_LIB ):
-    print "Error: libfakechroot.so not found on your system."
-    print "You need to install it."
+if not os.path.exists( conf.fakechroot_lib ):
+    print "Error: libfakechroot.so not found."
+    print "You may need to install it."
     print "On Fedora, it's in the fakechroot-libs package."
     print "Or you can download it from http://fakechroot.alioth.debian.org/"
     sys.exit(1)
 
-shutil.copy( FAKEROOT_LIB , LIBDIR )
+shutil.copy( conf.fakechroot_lib , LIBDIR )
 
 ents = []
 files = set()

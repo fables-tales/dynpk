@@ -14,6 +14,7 @@ class Config:
         self.library_dirs = self._opt_break( "library_dirs" )
         self.path = self._opt_break( "path" )
         self.use_audit = self.parser.getboolean( "dynpk", "use_audit" )
+        self.fakechroot_lib = self._get_opt_opt( "fakechroot_lib", "/usr/lib/fakechroot/libfakechroot.so" )
 
     def _opt_break(self, name):
         "Break up a space separated config option into a list"
@@ -27,5 +28,8 @@ class Config:
         l = [x.strip() for x in s.split()]
         return l
         
-        
-        
+    def _get_opt_opt(self, name, default):
+        try:
+            return self.parser.get( "dynpk", name )
+        except ConfigParser.NoOptionError:
+            return default
