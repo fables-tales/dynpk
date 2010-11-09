@@ -26,5 +26,5 @@ wrap: wrap.c $(LIBC)
 
 clean:
 	-rm -f *.o *.so wrap
-
+	-rm -rf glibc
 
